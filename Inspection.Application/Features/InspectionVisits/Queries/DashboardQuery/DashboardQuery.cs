@@ -9,7 +9,6 @@ public class DashboardQuery : IRequest<Response<DashboardDto>>
 {
 }
 
-
 public class DashboardQueryHandler : IRequestHandler<DashboardQuery, Response<DashboardDto>>
 {
     private readonly AppDbContext _context;
@@ -20,14 +19,20 @@ public class DashboardQueryHandler : IRequestHandler<DashboardQuery, Response<Da
 
     public async Task<Response<DashboardDto>> Handle(DashboardQuery request, CancellationToken cancellationToken)
     {
+        var plannedCount = await _context.InspectionVisits.CountAsync(iv => iv.Status == VisitStatus.Planned, cancellationToken);
+        var inProgressCount = await _context.InspectionVisits.CountAsync(iv => iv.Status == VisitStatus.InProgress, cancellationToken);
+        var completedCount = await _context.InspectionVisits.CountAsync(iv => iv.Status == VisitStatus.Completed, cancellationToken);
+        var cancelledCount = await _context.InspectionVisits.CountAsync(iv => iv.Status == VisitStatus.Cancelled, cancellationToken);
+
+        var averageScore = completedCount > 0 ? await _context.InspectionVisits.Where(iv => iv.Status == VisitStatus.Completed).AverageAsync(iv => iv.Score, cancellationToken) : 0;
+
         var dashboard = new DashboardDto
         {
-            PlannedCount = await _context.InspectionVisits.CountAsync(iv => iv.Status == VisitStatus.Planned, cancellationToken),
-            InProgressCount = await _context.InspectionVisits.CountAsync(iv => iv.Status == VisitStatus.InProgress, cancellationToken),
-            CompletedCount = await _context.InspectionVisits.CountAsync(iv => iv.Status == VisitStatus.Completed, cancellationToken),
-            CancelledCount = await _context.InspectionVisits.CountAsync(iv => iv.Status == VisitStatus.Cancelled, cancellationToken),
-            AverageScore = await _context.InspectionVisits.Where(iv => iv.Status == VisitStatus.Completed)
-                                                          .AverageAsync(iv => iv.Score, cancellationToken)
+            PlannedCount = plannedCount,
+            InProgressCount = inProgressCount,
+            CompletedCount = completedCount,
+            CancelledCount = cancelledCount,
+            AverageScore = averageScore
         };
 
         return new Response<DashboardDto>(dashboard, true, "Dashboard data retrieved successfully.");
